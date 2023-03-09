@@ -21,7 +21,7 @@
 #endif
 #include "warning-enable.hpp"
 
-streamfx::util::library::library(std::filesystem::path file) : _library(nullptr)
+streamfx::util::library::library(std::filesystem::path file) : _library(nullptr), _owner(true)
 {
 #if defined(ST_WINDOWS)
 	SetLastError(ERROR_SUCCESS);
@@ -57,13 +57,17 @@ streamfx::util::library::library(std::filesystem::path file) : _library(nullptr)
 #endif
 }
 
+streamfx::util::library::library(void* library) : _library(library), _owner(false) {}
+
 streamfx::util::library::~library()
 {
+	if (_owner) {
 #if defined(ST_WINDOWS)
-	FreeLibrary(reinterpret_cast<HMODULE>(_library));
+		FreeLibrary(reinterpret_cast<HMODULE>(_library));
 #elif defined(ST_UNIX)
-	dlclose(_library);
+		dlclose(_library);
 #endif
+	}
 }
 
 void* streamfx::util::library::load_symbol(std::string_view name)
@@ -95,4 +99,21 @@ std::shared_ptr<::streamfx::util::library> streamfx::util::library::load(std::fi
 std::shared_ptr<::streamfx::util::library> streamfx::util::library::load(std::string_view name)
 {
 	return load(std::filesystem::u8path(name));
+}
+
+std::shared_ptr<::streamfx::util::library> streamfx::util::library::load(obs_module_t* instance)
+{
+	auto path = std::filesystem::absolute({obs_get_module_binary_path(instance)});
+	auto kv   = libraries.find(path.u8string());
+	if (kv != libraries.end()) {
+		if (auto ptr = kv->second.lock(); ptr) {
+			return ptr;
+		}
+		libraries.erase(kv);
+	}
+
+	auto ptr = std::make_shared<::streamfx::util::library>(obs_get_module_lib(instance));
+	libraries.emplace(path.u8string(), ptr);
+
+	return ptr;
 }
