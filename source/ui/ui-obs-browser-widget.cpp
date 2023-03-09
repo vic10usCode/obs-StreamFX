@@ -6,21 +6,30 @@
 #include <mutex>
 
 #include <../plugins/obs-browser/panel/browser-panel.hpp>
+#ifdef D_PLATFORM_LINUX
+#include <obs-nix-platform.h>
+#endif
 #include "warning-enable.hpp"
 
 streamfx::ui::obs_browser_cef::obs_browser_cef()
 {
+#ifdef D_PLATFORM_LINUX
+	if (obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND) {
+		throw std::runtime_error("Wayland does not support Browser Widgets.");
+	}
+#endif
+
 	// Load the "obs-browser" module.
 	_module = util::library::load(obs_get_module("obs-browser"));
 	auto fn = reinterpret_cast<QCef* (*)(void)>(_module->load_symbol("obs_browser_create_qcef"));
 	if (!fn) {
-		throw std::runtime_error("Unable to create Browser Panel.");
+		throw std::runtime_error("Failed to load obs-browser module.");
 	}
 
 	// Create a QCef instance and initialize it.
 	_cef = fn();
 	if (!_cef) {
-		throw std::runtime_error("Unable to initialize for CEF-based Browser Panel.");
+		throw std::runtime_error("Failed to create or get QCef instance.");
 	}
 	reinterpret_cast<QCef*>(_cef)->init_browser();
 	reinterpret_cast<QCef*>(_cef)->wait_for_browser_init();
@@ -87,4 +96,14 @@ streamfx::ui::obs_browser_widget::~obs_browser_widget() {}
 void streamfx::ui::obs_browser_widget::set_url(QUrl url)
 {
 	dynamic_cast<QCefWidget*>(_widget)->setURL(url.toString().toStdString());
+}
+
+bool streamfx::ui::obs_browser_widget::is_available()
+{
+#ifdef D_PLATFORM_LINUX
+	if (obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND) {
+		return false;
+	}
+#endif
+	return true;
 }
