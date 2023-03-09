@@ -19,6 +19,9 @@
 #ifdef ENABLE_ENCODER_FFMPEG
 #include "encoders/encoder-ffmpeg.hpp"
 #endif
+#ifdef ENABLE_ENCODER_NVIDIA_NVENC
+#include "encoders/encoder-nvidia-nvenc.hpp"
+#endif
 
 #ifdef ENABLE_FILTER_AUTOFRAMING
 #include "filters/filter-autoframing.hpp"
@@ -121,8 +124,10 @@ MODULE_EXPORT bool obs_module_load(void)
 			streamfx::encoder::aom::av1::aom_av1_factory::initialize();
 #endif
 #ifdef ENABLE_ENCODER_FFMPEG
-			using namespace streamfx::encoder::ffmpeg;
-			ffmpeg_manager::initialize();
+			streamfx::encoder::ffmpeg::ffmpeg_manager::initialize();
+#endif
+#ifdef ENABLE_ENCODER_NVIDIA_NVENC
+			streamfx::encoder::nvidia::nvenc::h264_factory::initialize();
 #endif
 		}
 
@@ -262,6 +267,9 @@ MODULE_EXPORT void obs_module_unload(void)
 
 		// Encoders
 		{
+#ifdef ENABLE_ENCODER_NVIDIA_NVENC
+			streamfx::encoder::nvidia::nvenc::h264_factory::finalize();
+#endif
 #ifdef ENABLE_ENCODER_FFMPEG
 			streamfx::encoder::ffmpeg::ffmpeg_manager::finalize();
 #endif
